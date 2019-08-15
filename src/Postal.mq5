@@ -18,7 +18,7 @@
 #property indicator_type2   DRAW_NONE
 #property indicator_color2  clrDodgerBlue
 
-#property indicator_label3  "UpForward"
+#property indicator_label3  "UpOffset"
 #property indicator_type3   DRAW_LINE
 #property indicator_color3  clrRed
 #property indicator_style3  STYLE_DOT
@@ -27,7 +27,7 @@
 #property indicator_type4   DRAW_LINE
 #property indicator_color4  clrRed
 
-#property indicator_label5  "DownForward"
+#property indicator_label5  "DownOffset"
 #property indicator_type5   DRAW_LINE
 #property indicator_color5  clrLimeGreen
 #property indicator_style5  STYLE_DOT
@@ -45,18 +45,17 @@
 #property indicator_color8  clrAqua
 
 input int ema_period_ = 72; // Period
-input double forward_ = 300; // Forward fistance
-input double distance_ = 450; // Distance
+input double distance_ = 300; // Distance
 input double offset_ = 50; // Offset
-input int level_ = 2; // Level
+input int holding_ = 2; // Holding
 
 double sell_[];
 double buy_[];
 
-double up_forward_[];
+double up_offset_[];
 double up_distance_[];
 
-double down_forward_[];
+double down_offset_[];
 double down_distance_[];
 
 double ema_[];
@@ -67,9 +66,9 @@ int ema_handle_;
 int OnInit() {
    SetIndexBuffer(0, sell_, INDICATOR_DATA);
    SetIndexBuffer(1, buy_, INDICATOR_DATA);
-   SetIndexBuffer(2, up_forward_,INDICATOR_DATA);
+   SetIndexBuffer(2, up_offset_,INDICATOR_DATA);
    SetIndexBuffer(3, up_distance_,INDICATOR_DATA);
-   SetIndexBuffer(4, down_forward_,INDICATOR_DATA);
+   SetIndexBuffer(4, down_offset_,INDICATOR_DATA);
    SetIndexBuffer(5, down_distance_,INDICATOR_DATA);
    SetIndexBuffer(6, ema_,INDICATOR_DATA);
    SetIndexBuffer(7, ema_touched_,INDICATOR_DATA);
@@ -78,15 +77,15 @@ int OnInit() {
    
    PlotIndexSetInteger(2, PLOT_DRAW_BEGIN, ema_period_-1);
    
-   IndicatorSetString(INDICATOR_SHORTNAME,"Postal ("+string(ema_period_)+","+string(forward_)+","+string(distance_)+","+string(offset_)+")");
+   IndicatorSetString(INDICATOR_SHORTNAME,"Postal ("+string(ema_period_)+","+string(distance_)+","+string(offset_)+")");
    //PlotIndexSetString(2, PLOT_LABEL,"Env T-"+string(_Symbol)+"("+string(sma_period)+")Upper");
    //PlotIndexSetString(3, PLOT_LABEL,"Env T-"+string(_Symbol)+"("+string(sma_period)+")Lower");  
    
    ArrayInitialize(sell_, 0.0);
    ArrayInitialize(buy_, 0.0);
-   ArrayInitialize(up_forward_, 0.0);
+   ArrayInitialize(up_offset_, 0.0);
    ArrayInitialize(up_distance_, 0.0);
-   ArrayInitialize(down_forward_, 0.0);
+   ArrayInitialize(down_offset_, 0.0);
    ArrayInitialize(down_distance_, 0.0);
    ArrayInitialize(ema_, 0.0);
    ArrayInitialize(ema_touched_, 0.0);
@@ -136,10 +135,10 @@ int OnCalculate(
      
      ResetOnNewDay(i, time);
      
-     up_forward_[i] = ema_[i] + forward_;
+     up_offset_[i] = ema_[i] + distance_ - offset_;
      up_distance_[i] = ema_[i] + distance_;
 
-     down_forward_[i] = ema_[i] - forward_;
+     down_offset_[i] = ema_[i] - distance_ + offset_;
      down_distance_[i] = ema_[i] - distance_;
      
      if (i == 0) {
@@ -152,19 +151,8 @@ int OnCalculate(
        sell_[i] = 0.0;
        buy_[i] = 0.0;
      } else {
-       // A signal can be set using 2 levels:
-       //  * Level 1 is an anteciped signal, it is used to increase the
-       //    number of trades performe with an smaller number of contracts,
-       //    the trader will use some kind of piramiding to complete
-       //    the total lot size.
-       //
-       //  * Level 2 is the real signal, when using this level the trader
-       //    will enter the market using its full lot size.
-       if (level_ == 1) {
-         SetSignalForward(i, open, high, low);
-       } else if (level_ == 2) {
-         SetSignal(i, open, high, low);
-       }
+       SetSignal(i, open, high, low);
+       HoldSignal(i);
      }
    }
      
@@ -193,38 +181,35 @@ bool TouchedEma(const int i, const double &open[], const double &high[], const d
   return false;
 }
 
-void SetSignalForward(const int i, const double &open[], const double &high[], const double &low[]) {
-  if (open[i] < up_forward_[i] && high[i] >= up_forward_[i]) {
+void SetSignal(const int i, const double &open[], const double &high[], const double &low[]) {
+  if (open[i] < up_offset_[i] && high[i] >= up_offset_[i]) {
     sell_[i] = high[i];
     buy_[i] = 0.0;
     return;
   }
   
-  if (open[i] > down_forward_[i] && low[i] <= down_forward_[i]) {
+  if (open[i] > down_offset_[i] && low[i] <= down_offset_[i]) {
     sell_[i] = 0.0;
     buy_[i] = low[i];
     return;
   }
-  
+    
   sell_[i] = 0.0;
   buy_[i] = 0.0;
 }
 
-void SetSignal(const int i, const double &open[], const double &high[], const double &low[]) {
-  if (open[i] < up_distance_[i] && high[i] >= up_distance_[i]) {
-    sell_[i] = high[i];
-    buy_[i] = 0.0;
-    return;
+void HoldSignal(const int i) {
+  if (holding_ > 0 && i > holding_) {
+    if (buy_[i-1] > 0.0 && buy_[i-holding_] == 0.0) {
+      buy_[i] = buy_[i-1];
+      return;
+    }
+
+    if (sell_[i-1] > 0.0 && sell_[i-holding_] == 0.0) {
+      sell_[i] = sell_[i-1];
+      return;
+    }
   }
-  
-  if (open[i] > down_distance_[i] && low[i] <= down_distance_[i]) {
-    sell_[i] = 0.0;
-    buy_[i] = low[i];
-    return;
-  }
-  
-  sell_[i] = 0.0;
-  buy_[i] = 0.0;
 }
 
 int CopyData(const int to_copy) {
