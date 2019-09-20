@@ -45,9 +45,10 @@
 #property indicator_color8  clrAqua
 
 input int ema_period_ = 72; // Period
-input double distance_ = 300; // Distance
+input double distance_ = 400; // Distance
 input double offset_ = 50; // Offset
-input int holding_ = 2; // Holding
+input int holding_ = 3; // Holding
+input int touch_ = 1; // Touch
 
 double sell_[];
 double buy_[];
@@ -160,7 +161,7 @@ int OnCalculate(
 }
 
 bool TouchedEma(const int i, const double &open[], const double &high[], const double &low[]) {
-  if (ema_touched_[i-1] == 1.0) {
+  if (ema_touched_[i-1] == 1.0 || touch_ == 0) {
     ema_touched_[i] = 1.0;
     return true;
   }
@@ -183,14 +184,14 @@ bool TouchedEma(const int i, const double &open[], const double &high[], const d
 
 void SetSignal(const int i, const double &open[], const double &high[], const double &low[]) {
   if (open[i] < up_offset_[i] && high[i] >= up_offset_[i]) {
-    sell_[i] = high[i];
+    sell_[i] = high[i]+offset_;
     buy_[i] = 0.0;
     return;
   }
   
   if (open[i] > down_offset_[i] && low[i] <= down_offset_[i]) {
     sell_[i] = 0.0;
-    buy_[i] = low[i];
+    buy_[i] = low[i]-offset_;
     return;
   }
     
