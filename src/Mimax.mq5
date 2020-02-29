@@ -52,6 +52,7 @@
 double input trigger_ = 780; // Distance
 double input delta_ = 100; // Offset
 int input holding_ = 3; // Holding
+int input mode_ = 0; // (0: Percentage, 1: Point)
 
 double sell_[];
 double buy_[];
@@ -88,7 +89,7 @@ int OnInit() {
    
    ArrayInitialize(up_offset_, 0.0);
    ArrayInitialize(down_offset_, 0.0);
-         
+            
    return(INIT_SUCCEEDED);
 }
 
@@ -142,10 +143,13 @@ int OnCalculate(
        //direction_[i] = direction_[i-1];
      }
 
-     //up_band_[i] = min_[i] + trigger_;
-     //down_band_[i] = max_[i] - trigger_;
-     up_band_[i] = min_[i] *(1+trigger_);
-     down_band_[i] = max_[i] *(1-trigger_);
+     if (mode_ == 0) {
+       up_band_[i] = min_[i] *(1+trigger_);
+       down_band_[i] = max_[i] *(1-trigger_);
+     } else if (mode_ == 1) {
+       up_band_[i] = min_[i] + trigger_;
+       down_band_[i] = max_[i] - trigger_;
+     }
           
      up_offset_[i] = up_band_[i] - delta_;
      down_offset_[i] = down_band_[i] + delta_;
@@ -206,5 +210,7 @@ void ResetOnNewDay(const datetime &time[], int i) {
   if (previous.day != now.day) {
     max_[i] = min_[i] = 0;
     max_[i-1] = min_[i-1] = 0;
+    buy_[i] = 0.0;
+    sell_[i] = 0.0;
   }
 }
